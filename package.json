@@ -1,0 +1,19 @@
+{
+  "name": "music_vis",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "start": "serve -p 3002",
+    "dev": "serve -p 3002"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "devDependencies": {
+    "serve": "^14.2.5"
+  },
+  "dependencies": {
+    "three": "^0.179.0"
+  }
+}

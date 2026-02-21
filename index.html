@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>Music Visualizer - Linked Particles</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { overflow: hidden; background: #14171a; }
+        canvas { display: block; }
+        #start-overlay {
+            position: fixed; top: 0; left: 0;
+            width: 100%; height: 100%;
+            background: rgba(20, 23, 26, 0.95);
+            display: flex; flex-direction: column;
+            justify-content: center; align-items: center;
+            z-index: 1000; cursor: pointer;
+        }
+        #start-overlay h1 { color: #fff; font-size: 2.5em; }
+        #audio-status {
+            position: fixed; bottom: 20px; left: 20px;
+            color: #666; font-size: 0.9em; z-index: 100;
+        }
+        #audio-status.active { color: #4ade80; }
+        #audio-status.error { color: #f87171; }
+    </style>
+    <script type="importmap">
+    {
+        "imports": {
+            "three": "./node_modules/three/build/three.webgpu.js",
+            "three/webgpu": "./node_modules/three/build/three.webgpu.js",
+            "three/tsl": "./node_modules/three/build/three.tsl.js",
+            "three/addons/": "./node_modules/three/examples/jsm/"
+        }
+    }
+    </script>
+</head>
+<body>
+    <div id="start-overlay"><h1>Click to Start</h1></div>
+    <div id="audio-status">Audio: Waiting...</div>
+    <script type="module" src="main.js"></script>
+</body>
+</html>
