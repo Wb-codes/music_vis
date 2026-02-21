@@ -12,8 +12,13 @@ import WebGPU from "three/addons/capabilities/WebGPU.js";
 let camera, scene, renderer, postProcessing, controls, light;
 let updateParticles, spawnParticles;
 let linksVerticesSBA, linksColorsSBA;
+let bloomPass;
+let clock = new THREE.Clock();
+let elapsedTime = 0;
 
 const nbParticles = Math.pow(2, 13);
+
+// Base parameters
 const timeScale = uniform(1.0);
 const particleLifetime = uniform(0.5);
 const particleSize = uniform(1.0);
@@ -31,13 +36,54 @@ const turbOctaves = uniform(2);
 const turbLacunarity = uniform(2.0);
 const turbGain = uniform(0.5);
 const turbFriction = uniform(0.01);
+
+// Audio data
 const audioBass = uniform(0.0);
 const audioMid = uniform(0.0);
 const audioHigh = uniform(0.0);
 const audioOverall = uniform(0.0);
 
+// Audio sensitivity settings (multipliers for how much each frequency affects parameters)
+const settings = {
+    // Bass controls
+    bassSpawnRate: { value: 50, min: 0, max: 200, label: "Bass -> Spawn Rate" },
+    bassRadius: { value: 3, min: 0, max: 10, label: "Bass -> Orbit Radius" },
+    bassPush: { value: 0.02, min: 0, max: 0.1, label: "Bass -> Push Force" },
+    
+    // Mid controls  
+    midTurbulence: { value: 2, min: 0, max: 5, label: "Mid -> Turbulence" },
+    midFrequency: { value: 0.5, min: 0, max: 2, label: "Mid -> Turb Frequency" },
+    midSpeed: { value: 0.5, min: 0, max: 2, label: "Mid -> Orbit Speed" },
+    
+    // High controls
+    highSize: { value: 2, min: 0, max: 5, label: "High -> Particle Size" },
+    highColorSpeed: { value: 3, min: 0, max: 10, label: "High -> Color Speed" },
+    
+    // Overall controls
+    overallLifetime: { value: 0.5, min: 0, max: 1, label: "Overall -> Lifetime" },
+    
+    // Audio sensitivity
+    bassSensitivity: { value: 1.5, min: 0.1, max: 5, label: "Bass Sensitivity" },
+    midSensitivity: { value: 1.5, min: 0.1, max: 5, label: "Mid Sensitivity" },
+    highSensitivity: { value: 1.5, min: 0.1, max: 5, label: "High Sensitivity" },
+    
+    // Base values
+    baseSpawnRate: { value: 5, min: 1, max: 50, label: "Base Spawn Rate" },
+    baseTurbulence: { value: 0.5, min: 0, max: 2, label: "Base Turbulence" },
+    baseSize: { value: 1, min: 0.1, max: 3, label: "Base Size" },
+    baseRadius: { value: 2, min: 0.5, max: 5, label: "Base Orbit Radius" },
+    
+    // Bloom
+    bloomStrength: { value: 0.75, min: 0, max: 3, label: "Bloom Strength" },
+    bloomThreshold: { value: 0.1, min: 0, max: 2, label: "Bloom Threshold" },
+    bloomRadius: { value: 0.5, min: 0, max: 1, label: "Bloom Radius" },
+    
+    // Controls
+    autoRotate: { value: true, label: "Auto Rotate" },
+    autoRotateSpeed: { value: 2, min: -10, max: 10, label: "Rotate Speed" }
+};
+
 let audioContext, analyser, dataArray;
-let clock = new THREE.Clock();
 
 async function initAudio() {
     try {
@@ -54,8 +100,8 @@ async function initAudio() {
 
         audioContext = new (window.AudioContext || window.webkitAudioContext)();
         analyser = audioContext.createAnalyser();
-        analyser.fftSize = 256;
-        analyser.smoothingTimeConstant = 0.8;
+        analyser.fftSize = 512;
+        analyser.smoothingTimeConstant = 0.75;
         const source = audioContext.createMediaStreamSource(new MediaStream([audioTrack]));
         source.connect(analyser);
         dataArray = new Uint8Array(analyser.frequencyBinCount);
@@ -75,8 +121,9 @@ function updateAudioData() {
     if (!analyser || !dataArray) return;
     analyser.getByteFrequencyData(dataArray);
     const len = dataArray.length;
-    const bassEnd = Math.floor(len * 0.1);
-    const midEnd = Math.floor(len * 0.5);
+    const bassEnd = Math.floor(len * 0.08);
+    const midEnd = Math.floor(len * 0.4);
+    
     let bassSum = 0, midSum = 0, highSum = 0;
     for (let i = 0; i < len; i++) {
         const val = dataArray[i] / 255;
@@ -84,10 +131,137 @@ function updateAudioData() {
         else if (i < midEnd) midSum += val;
         else highSum += val;
     }
-    audioBass.value = (bassSum / bassEnd) * 2;
-    audioMid.value = (midSum / (midEnd - bassEnd)) * 2;
-    audioHigh.value = (highSum / (len - midEnd)) * 2;
+    
+    const bassNorm = (bassSum / bassEnd);
+    const midNorm = (midSum / (midEnd - bassEnd));
+    const highNorm = (highSum / (len - midEnd));
+    
+    audioBass.value = Math.min(bassNorm * settings.bassSensitivity.value, 1);
+    audioMid.value = Math.min(midNorm * settings.midSensitivity.value, 1);
+    audioHigh.value = Math.min(highNorm * settings.highSensitivity.value, 1);
     audioOverall.value = (audioBass.value + audioMid.value + audioHigh.value) / 3;
+}
+
+function createGUI() {
+    const container = document.getElementById('controls');
+    const toggleBtn = document.getElementById('toggle-controls');
+    
+    toggleBtn.classList.add('visible');
+    toggleBtn.onclick = () => {
+        container.classList.toggle('visible');
+        toggleBtn.textContent = container.classList.contains('visible') ? 'Hide' : 'Settings';
+    };
+    
+    function createFolder(name) {
+        const folder = document.createElement('div');
+        folder.className = 'folder open';
+        
+        const h3 = document.createElement('h3');
+        h3.textContent = name + ' ▼';
+        h3.onclick = () => {
+            folder.classList.toggle('open');
+            h3.textContent = name + (folder.classList.contains('open') ? ' ▼' : ' ▶');
+        };
+        
+        const content = document.createElement('div');
+        content.className = 'folder-content';
+        
+        folder.appendChild(h3);
+        folder.appendChild(content);
+        return { folder, content };
+    }
+    
+    function addSlider(container, key, isBoolean = false) {
+        const s = settings[key];
+        const row = document.createElement('div');
+        row.className = 'control-row';
+        
+        const label = document.createElement('label');
+        label.textContent = s.label;
+        
+        if (isBoolean) {
+            const checkbox = document.createElement('input');
+            checkbox.type = 'checkbox';
+            checkbox.checked = s.value;
+            checkbox.onchange = () => { s.value = checkbox.checked; };
+            row.appendChild(label);
+            row.appendChild(checkbox);
+        } else {
+            const input = document.createElement('input');
+            input.type = 'range';
+            input.min = s.min;
+            input.max = s.max;
+            input.step = (s.max - s.min) / 100;
+            input.value = s.value;
+            
+            const valueDisplay = document.createElement('span');
+            valueDisplay.className = 'value';
+            valueDisplay.textContent = s.value.toFixed(2);
+            
+            input.oninput = () => {
+                s.value = parseFloat(input.value);
+                valueDisplay.textContent = s.value.toFixed(2);
+            };
+            
+            row.appendChild(label);
+            row.appendChild(input);
+            row.appendChild(valueDisplay);
+        }
+        
+        container.appendChild(row);
+    }
+    
+    // Bass folder
+    const bassFolder = createFolder('Bass Response');
+    addSlider(bassFolder.content, 'bassSensitivity');
+    addSlider(bassFolder.content, 'bassSpawnRate');
+    addSlider(bassFolder.content, 'bassRadius');
+    addSlider(bassFolder.content, 'bassPush');
+    container.appendChild(bassFolder.folder);
+    
+    // Mid folder
+    const midFolder = createFolder('Mid Response');
+    addSlider(midFolder.content, 'midSensitivity');
+    addSlider(midFolder.content, 'midTurbulence');
+    addSlider(midFolder.content, 'midFrequency');
+    addSlider(midFolder.content, 'midSpeed');
+    container.appendChild(midFolder.folder);
+    
+    // High folder
+    const highFolder = createFolder('High Response');
+    addSlider(highFolder.content, 'highSensitivity');
+    addSlider(highFolder.content, 'highSize');
+    addSlider(highFolder.content, 'highColorSpeed');
+    container.appendChild(highFolder.folder);
+    
+    // Overall folder
+    const overallFolder = createFolder('Overall');
+    addSlider(overallFolder.content, 'overallLifetime');
+    container.appendChild(overallFolder.folder);
+    
+    // Base Values folder
+    const baseFolder = createFolder('Base Values');
+    addSlider(baseFolder.content, 'baseSpawnRate');
+    addSlider(baseFolder.content, 'baseTurbulence');
+    addSlider(baseFolder.content, 'baseSize');
+    addSlider(baseFolder.content, 'baseRadius');
+    container.appendChild(baseFolder.folder);
+    
+    // Bloom folder
+    const bloomFolder = createFolder('Bloom');
+    addSlider(bloomFolder.content, 'bloomStrength');
+    addSlider(bloomFolder.content, 'bloomThreshold');
+    addSlider(bloomFolder.content, 'bloomRadius');
+    container.appendChild(bloomFolder.folder);
+    
+    // Controls folder
+    const ctrlFolder = createFolder('Camera');
+    addSlider(ctrlFolder.content, 'autoRotate', true);
+    addSlider(ctrlFolder.content, 'autoRotateSpeed');
+    container.appendChild(ctrlFolder.folder);
+    
+    container.classList.add('visible');
+    toggleBtn.textContent = 'Hide';
 }
 
 async function init() {
@@ -270,11 +444,10 @@ async function init() {
     })().compute(nbToSpawn.value);
 
     // Init particles
-    const initParticles = Fn(() => {
+    renderer.compute(Fn(() => {
         particlePositions.element(instanceIndex).xyz.assign(vec3(10000.0));
         particlePositions.element(instanceIndex).w.assign(float(-1.0));
-    })().compute(nbParticles);
-    renderer.compute(initParticles);
+    })().compute(nbParticles));
 
     // Background
     const backgroundGeom = new THREE.IcosahedronGeometry(100, 5).applyMatrix4(new THREE.Matrix4().makeScale(-1, 1, 1));
@@ -291,15 +464,18 @@ async function init() {
     // Post processing
     const scenePass = pass(scene, camera);
     const scenePassColor = scenePass.getTextureNode('output');
-    const bloomPass = bloom(scenePassColor, 0.75, 0.1, 0.5);
+    bloomPass = bloom(scenePassColor, settings.bloomStrength.value, settings.bloomThreshold.value, settings.bloomRadius.value);
     postProcessing = new THREE.PostProcessing(renderer, scenePassColor.add(bloomPass));
 
     controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
-    controls.autoRotate = true;
+    controls.autoRotate = settings.autoRotate.value;
+    controls.autoRotateSpeed = settings.autoRotateSpeed.value;
     controls.maxDistance = 75;
 
     window.addEventListener('resize', onWindowResize);
+    
+    createGUI();
     renderer.setAnimationLoop(animate);
 }
 
@@ -309,41 +485,59 @@ function onWindowResize() {
     renderer.setSize(window.innerWidth, window.innerHeight);
 }
 
-let elapsed = 0;
 function animate() {
     const delta = clock.getDelta();
-    elapsed += delta;
+    elapsedTime += delta;
+
     updateAudioData();
 
     const bass = audioBass.value;
     const mid = audioMid.value;
     const high = audioHigh.value;
+    const overall = audioOverall.value;
 
-    nbToSpawn.value = Math.floor(5 + bass * 50);
-    turbAmplitude.value = 0.5 + mid * 2;
-    turbFrequency.value = 0.5 + mid * 0.5;
-    particleSize.value = 1.0 + high * 2;
-    colorRotationSpeed.value = 1.0 + audioOverall.value * 3;
-    particleLifetime.value = 0.5 + (1 - audioOverall.value) * 0.5;
+    // Apply audio-reactive parameters based on settings
+    nbToSpawn.value = Math.floor(settings.baseSpawnRate.value + bass * settings.bassSpawnRate.value);
+    turbAmplitude.value = settings.baseTurbulence.value + mid * settings.midTurbulence.value;
+    turbFrequency.value = 0.5 + mid * settings.midFrequency.value;
+    particleSize.value = settings.baseSize.value + high * settings.highSize.value;
+    colorRotationSpeed.value = 1.0 + high * settings.highColorSpeed.value;
+    particleLifetime.value = 0.5 + (1 - overall * settings.overallLifetime.value) * 0.5;
+
+    // Update bloom settings
+    bloomPass.strength.value = settings.bloomStrength.value;
+    bloomPass.threshold.value = settings.bloomThreshold.value;
+    bloomPass.radius.value = settings.bloomRadius.value;
+
+    // Update controls
+    controls.autoRotate = settings.autoRotate.value;
+    controls.autoRotateSpeed = settings.autoRotateSpeed.value;
 
     renderer.compute(updateParticles);
     renderer.compute(spawnParticles);
 
     spawnIndex.value = (spawnIndex.value + nbToSpawn.value) % nbParticles;
 
-    const radius = 2 + bass * 3;
-    const speed = 0.5 + mid * 0.5;
+    // Spawn position with audio-reactive orbit
+    const radius = settings.baseRadius.value + bass * settings.bassRadius.value;
+    const speed = 0.5 + mid * settings.midSpeed.value;
     const targetPos = new THREE.Vector3(
-        Math.sin(elapsed * speed) * radius,
-        Math.cos(elapsed * speed * 1.3) * radius * 0.5,
-        Math.sin(elapsed * speed * 0.7) * radius
+        Math.sin(elapsedTime * speed) * radius,
+        Math.cos(elapsedTime * speed * 1.3) * radius * 0.5,
+        Math.sin(elapsedTime * speed * 0.7) * radius
     );
+    
     previousSpawnPosition.value.copy(spawnPosition.value);
     spawnPosition.value.lerp(targetPos, 0.1);
 
     colorOffset.value += delta * colorRotationSpeed.value * timeScale.value;
 
-    light.position.set(Math.sin(elapsed * 0.5) * 30, Math.cos(elapsed * 0.3) * 30, Math.sin(elapsed * 0.2) * 30);
+    light.position.set(
+        Math.sin(elapsedTime * 0.5) * 30,
+        Math.cos(elapsedTime * 0.3) * 30,
+        Math.sin(elapsedTime * 0.2) * 30
+    );
+
     controls.update();
     postProcessing.render();
 }

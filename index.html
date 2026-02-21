@@ -6,8 +6,9 @@
     <meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { overflow: hidden; background: #14171a; }
+        body { overflow: hidden; background: #14171a; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
         canvas { display: block; }
+        
         #start-overlay {
             position: fixed; top: 0; left: 0;
             width: 100%; height: 100%;
@@ -17,12 +18,90 @@
             z-index: 1000; cursor: pointer;
         }
         #start-overlay h1 { color: #fff; font-size: 2.5em; }
+        
         #audio-status {
             position: fixed; bottom: 20px; left: 20px;
             color: #666; font-size: 0.9em; z-index: 100;
         }
         #audio-status.active { color: #4ade80; }
         #audio-status.error { color: #f87171; }
+
+        #controls {
+            position: fixed; top: 10px; right: 10px;
+            background: rgba(20, 23, 26, 0.9);
+            padding: 15px;
+            border-radius: 8px;
+            color: #fff;
+            font-size: 12px;
+            z-index: 100;
+            max-height: 90vh;
+            overflow-y: auto;
+            width: 280px;
+            display: none;
+        }
+        #controls.visible { display: block; }
+        
+        #controls h3 {
+            margin: 0 0 10px 0;
+            padding-bottom: 5px;
+            border-bottom: 1px solid #444;
+            font-size: 14px;
+            color: #aaa;
+            cursor: pointer;
+        }
+        #controls h3:hover { color: #fff; }
+        
+        #controls .folder {
+            margin-bottom: 15px;
+        }
+        #controls .folder-content {
+            display: none;
+        }
+        #controls .folder.open .folder-content {
+            display: block;
+        }
+        
+        .control-row {
+            display: flex;
+            align-items: center;
+            margin: 5px 0;
+        }
+        .control-row label {
+            width: 100px;
+            color: #ccc;
+            font-size: 11px;
+        }
+        .control-row input[type="range"] {
+            flex: 1;
+            margin: 0 8px;
+            accent-color: #667eea;
+        }
+        .control-row .value {
+            width: 45px;
+            text-align: right;
+            color: #888;
+            font-size: 10px;
+        }
+        
+        .section-label {
+            color: #667eea;
+            font-size: 11px;
+            margin: 10px 0 5px 0;
+            font-weight: bold;
+        }
+        
+        #toggle-controls {
+            position: fixed; top: 10px; right: 10px;
+            background: rgba(102, 126, 234, 0.8);
+            border: none;
+            color: #fff;
+            padding: 8px 12px;
+            border-radius: 5px;
+            cursor: pointer;
+            z-index: 101;
+            display: none;
+        }
+        #toggle-controls.visible { display: block; }
     </style>
     <script type="importmap">
     {
@@ -38,6 +117,8 @@
 <body>
     <div id="start-overlay"><h1>Click to Start</h1></div>
     <div id="audio-status">Audio: Waiting...</div>
+    <button id="toggle-controls">Settings</button>
+    <div id="controls"></div>
     <script type="module" src="main.js"></script>
 </body>
 </html>
