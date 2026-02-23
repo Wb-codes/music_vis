@@ -6,9 +6,8 @@
 
 import { initVisualization, stopAnimation } from './src/core/bootstrap.js';
 import { initAudio, analyzeAudio, isAudioActive } from './src/audio/capture.js';
-import { createPointsGUI, createParticlesGUI, createSkinningGUI } from './src/gui/index.js';
+import { createPointsGUI, createParticlesGUI, createSkinningGUI, createSceneSelector, updateSceneSelector } from './src/gui/index.js';
 import { createSettings } from './src/settings/defaults.js';
-import { getSceneName } from './src/scenes/registry.js';
 import { 
     syncSettingsToSpout, 
     syncAudioToSpout,
@@ -20,6 +19,7 @@ import {
 const settings = createSettings();
 let app = null;
 let currentSceneType = 'particles';
+let audioInitialized = false;
 
 /**
  * Initialize the application with scene and Spout support.
@@ -57,49 +57,80 @@ async function init(sceneType) {
         console.warn('Unknown scene type:', sceneType);
     }
 
-    // Update scene indicator
-    const indicator = document.getElementById('scene-indicator');
-    if (indicator) {
-        indicator.classList.add('visible');
-        document.getElementById('scene-name').textContent = getSceneName(sceneType);
+  // Hide scene indicator (using dropdown instead)
+  const indicator = document.getElementById('scene-indicator');
+  if (indicator) {
+    indicator.style.display = 'none';
+  }
+
+  // Create scene selector dropdown
+  createSceneSelector(sceneType, switchSceneWithGUI);
+}
+
+/**
+ * Switch to a different scene without reinitializing audio.
+ * @param {string} sceneType - The scene type to switch to
+ */
+export async function switchSceneWithGUI(sceneType) {
+  if (sceneType === currentSceneType) return;
+
+  console.log('Switching scene from', currentSceneType, 'to', sceneType);
+  currentSceneType = sceneType;
+
+  // Stop current animation
+  stopAnimation();
+
+  // Cleanup current scene
+  if (app) {
+    app.cleanup();
+  }
+
+  // Clear controls
+  document.getElementById('controls').innerHTML = '';
+
+  // Initialize new scene
+  app = await initVisualization({
+    settings,
+    sceneType,
+    onSettingsChange: () => syncSettingsToSpout(settings),
+    onAudioUpdate: (audioData) => {
+      if (isAudioActive()) {
+        syncAudioToSpout(audioData);
+      }
     }
+  });
+
+  // Sync scene to Spout
+  syncSceneToSpout(sceneType);
+
+  // Create scene-specific GUI
+  const container = document.getElementById('controls');
+  const isElectron = window.isElectron === true;
+
+  if (sceneType === 'points') {
+    createPointsGUI(settings, container, () => syncSettingsToSpout(settings), isElectron);
+  } else if (sceneType === 'particles') {
+    createParticlesGUI(settings, container, () => syncSettingsToSpout(settings), isElectron);
+  } else if (sceneType === 'skinning') {
+    createSkinningGUI(settings, container, () => syncSettingsToSpout(settings), isElectron);
+  }
+
+  // Update scene selector dropdown
+  updateSceneSelector(sceneType);
 }
 
 // === Event Listeners ===
 
-// Scene selection buttons
-document.querySelectorAll('.scene-btn').forEach(btn => {
-    btn.addEventListener('click', async (e) => {
-        const sceneType = e.target.dataset.scene;
-        document.getElementById('start-overlay').style.display = 'none';
-        
-        // Initialize audio first
-        await initAudio();
-        
-        // Initialize visualization
-        await init(sceneType);
-        
-        // Sync scene to Spout
-        syncSceneToSpout(sceneType);
-    });
-});
+// Start button - initialize audio once and start with particles scene
+document.getElementById('start-btn')?.addEventListener('click', async () => {
+  document.getElementById('start-overlay').style.display = 'none';
 
-// Scene change on indicator click
-document.getElementById('scene-indicator')?.addEventListener('click', () => {
-    // Stop animation
-    stopAnimation();
-    
-    // Cleanup app if exists
-    if (app) {
-        app.cleanup();
-        app = null;
-    }
-    
-    // Show overlay again
-    document.getElementById('start-overlay').style.display = 'flex';
-    document.getElementById('scene-indicator').classList.remove('visible');
-    
-    // Clear controls
-    document.getElementById('controls').innerHTML = '';
-    document.getElementById('toggle-controls').classList.remove('visible');
+  // Initialize audio only once
+  if (!audioInitialized) {
+    await initAudio();
+    audioInitialized = true;
+  }
+
+  // Start with particles scene
+  await init('particles');
 });

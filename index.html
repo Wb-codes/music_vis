@@ -141,15 +141,13 @@
     </script>
 </head>
 <body>
-    <div id="start-overlay">
-        <h1>Music Visualizer</h1>
-        <p>Select a scene to start</p>
-        <div class="scene-select">
-            <button class="scene-btn" data-scene="particles">Linked Particles</button>
-            <button class="scene-btn" data-scene="points">Instanced Points</button>
-            <button class="scene-btn" data-scene="skinning">Skinning Points</button>
-        </div>
+  <div id="start-overlay">
+    <h1>Music Visualizer</h1>
+    <p>Click to start the visualizer</p>
+    <div class="scene-select">
+      <button class="scene-btn" id="start-btn">Start Visualizer</button>
     </div>
+  </div>
     <div id="audio-status">Audio: Waiting...</div>
     <button id="toggle-controls">Settings</button>
     <div id="scene-indicator">Scene: <span id="scene-name">-</span> (click to change)</div>

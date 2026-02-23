@@ -23,6 +23,10 @@ let spoutEnabled = false;
 let spoutSenderName = 'Music Visualizer';
 let hasShownSpoutDialog = false;
 let paintCount = 0;
+let lastFrameTime = 0;
+let texturePathCount = 0;
+let bitmapPathCount = 0;
+let frameSkip = 0;
 
 function createMainWindow() {
   mainWindow = new BrowserWindow({
@@ -45,15 +49,20 @@ function createMainWindow() {
   });
 }
 
-async function createSpoutWindow() {
+async function createSpoutWindow(resolution = '1080p') {
   if (spoutWindow) return;
 
   console.log('Creating spout window...');
-  
+
+  // Set resolution based on setting
+  const width = resolution === '720p' ? 1280 : 1920;
+  const height = resolution === '720p' ? 720 : 1080;
+  console.log(`Spout resolution: ${width}x${height}`);
+
   spoutWindow = new BrowserWindow({
     show: false,
-    width: 1920,
-    height: 1080,
+    width: width,
+    height: height,
     frame: false,
     transparent: true,
     webPreferences: {
@@ -78,19 +87,36 @@ async function createSpoutWindow() {
 
   spoutWindow.webContents.on('paint', (event, dirty, image, texture) => {
     paintCount++;
+    
+    // Log which transfer method is being used every 60 frames
     if (paintCount % 60 === 0) {
-      console.log('Spout paint #', paintCount, 'hasTexture:', !!texture, 'hasSender:', !!spoutSender, 'enabled:', spoutEnabled);
+      const totalFrames = texturePathCount + bitmapPathCount;
+      const texturePercent = totalFrames > 0 ? ((texturePathCount / totalFrames) * 100).toFixed(1) : 0;
+      console.log(`Spout paint #${paintCount} - Texture: ${texturePathCount}, Bitmap: ${bitmapPathCount} (${texturePercent}% texture)`);
     }
-    if (spoutSender && spoutEnabled) {
-      try {
-        if (texture) {
-          spoutSender.updateTexture(texture);
-        } else if (image) {
-          spoutSender.updateFrame(image.getBitmap(), image.getSize());
+    
+    if (!spoutSender || !spoutEnabled) return;
+    
+    try {
+      // Frame pacing - skip frames if needed
+      if (frameSkip > 0) {
+        if (paintCount % (frameSkip + 1) !== 0) {
+          return; // Skip this frame
         }
-      } catch (err) {
-        console.error('Spout update error:', err);
       }
+      
+      if (texture) {
+        // Fast path: GPU texture sharing (zero-copy)
+        texturePathCount++;
+        spoutSender.updateTexture(texture);
+      } else if (image) {
+        // Slow path: CPU bitmap (causes latency)
+        bitmapPathCount++;
+        const size = image.getSize();
+        spoutSender.updateFrame(image.getBitmap(), size);
+      }
+    } catch (err) {
+      console.error('Spout update error:', err);
     }
   });
 
@@ -151,39 +177,41 @@ ipcMain.handle('spout:check-available', () => {
   return spoutAvailable;
 });
 
-ipcMain.handle('spout:enable', async () => {
-  if (!spoutAvailable) {
-    if (!hasShownSpoutDialog && mainWindow) {
-      hasShownSpoutDialog = true;
-      dialog.showMessageBox(mainWindow, {
-        type: 'info',
-        title: 'Spout Not Available',
-        message: 'Spout output is not available.',
-        detail: 'To enable Spout:\n\n1. Install CMake from https://cmake.org/download/\n2. Install Visual Studio Build Tools with C++ development\n3. Run: npm run rebuild-spout\n\nAlternatively, use OBS with its Spout plugin to capture the window.',
-        buttons: ['OK']
-      });
+  ipcMain.handle('spout:enable', async (event, options = {}) => {
+    if (!spoutAvailable) {
+      if (!hasShownSpoutDialog && mainWindow) {
+        hasShownSpoutDialog = true;
+        dialog.showMessageBox(mainWindow, {
+          type: 'info',
+          title: 'Spout Not Available',
+          message: 'Spout output is not available.',
+          detail: 'To enable Spout:\\n\\n1. Install CMake from https://cmake.org/download/\\n2. Install Visual Studio Build Tools with C++ development\\n3. Run: npm run rebuild-spout\\n\\nAlternatively, use OBS with its Spout plugin to capture the window.',
+          buttons: ['OK']
+        });
+      }
+      return { success: false, error: 'Spout not available - native module not compiled' };
     }
-    return { success: false, error: 'Spout not available - native module not compiled' };
-  }
 
-  try {
-    await createSpoutWindow();
-    spoutSender = new SpoutOutput(spoutSenderName);
-    spoutEnabled = true;
-    console.log('Spout sender created:', spoutSenderName);
-    
-    // Request current scene from main window
-    mainWindow.webContents.send('spout:request-scene');
-    
-    if (mainWindow) {
-      mainWindow.webContents.send('spout:status-changed', true);
+    try {
+      // Get resolution from options
+      const resolution = options.resolution || '1080p';
+      await createSpoutWindow(resolution);
+      spoutSender = new SpoutOutput(spoutSenderName);
+      spoutEnabled = true;
+      console.log('Spout sender created:', spoutSenderName, 'at', resolution);
+
+      // Request current scene from main window
+      mainWindow.webContents.send('spout:request-scene');
+
+      if (mainWindow) {
+        mainWindow.webContents.send('spout:status-changed', true);
+      }
+      return { success: true };
+    } catch (e) {
+      console.error('Spout enable error:', e);
+      return { success: false, error: e.message };
     }
-    return { success: true };
-  } catch (e) {
-    console.error('Spout enable error:', e);
-    return { success: false, error: e.message };
-  }
-});
+  });
 
 ipcMain.handle('spout:disable', () => {
   spoutEnabled = false;
@@ -201,6 +229,12 @@ ipcMain.handle('spout:get-status', () => {
 
 ipcMain.handle('spout:update-name', (event, name) => {
   updateSpoutSenderName(name);
+  return { success: true };
+});
+
+ipcMain.handle('spout:update-frame-skip', (event, skip) => {
+  frameSkip = skip;
+  console.log('Spout frame skip updated:', skip);
   return { success: true };
 });
 

@@ -138,11 +138,15 @@ export const defaultSettings = {
     /** Enable green screen background for OBS chroma key */
     greenScreen: { value: false, label: "Green Screen" },
     
-    // === Spout Output (Electron only) ===
-    /** Enable Spout output */
-    spoutEnabled: { value: false, label: "Enable Spout" },
-    /** Spout sender name for receiver apps */
-    spoutSenderName: { value: "Music Visualizer", label: "Sender Name" }
+// === Spout Output (Electron only) ===
+  /** Enable Spout output */
+  spoutEnabled: { value: false, label: "Enable Spout" },
+  /** Spout sender name for receiver apps */
+  spoutSenderName: { value: "Music Visualizer", label: "Sender Name" },
+  /** Spout output resolution for performance */
+  spoutResolution: { value: "1080p", options: ["720p", "1080p"], label: "Resolution" },
+  /** Spout frame skip for performance (0 = no skip, 1 = 30fps, 2 = 20fps) */
+  spoutFrameSkip: { value: 0, min: 0, max: 2, label: "Frame Skip (0=60fps, 1=30fps, 2=20fps)" }
 };
 
 /**

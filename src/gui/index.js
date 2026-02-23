@@ -4,6 +4,8 @@
  * Creates a collapsible folder-based interface for adjusting visualization parameters.
  */
 
+import { SCENE_NAMES } from '../core/constants.js';
+
 /**
  * Create a folder in the GUI.
  * @param {string} name - Folder display name
@@ -130,7 +132,90 @@ export function addTextInput(container, setting, onChange) {
  * @returns {HTMLElement} The created row element
  */
 export function addCheckbox(container, setting, onChange) {
-    return addSlider(container, setting, onChange);
+  return addSlider(container, setting, onChange);
+}
+
+/**
+ * Create a scene selector dropdown at the top-left of the screen.
+ * @param {string} currentScene - Current scene type
+ * @param {Function} onSceneChange - Callback when scene changes, receives sceneType
+ * @returns {HTMLElement} The created dropdown container
+ */
+export function createSceneSelector(currentScene, onSceneChange) {
+  // Remove existing scene selector if present
+  const existing = document.getElementById('scene-selector');
+  if (existing) existing.remove();
+
+  // Create container
+  const container = document.createElement('div');
+  container.id = 'scene-selector';
+  container.style.cssText = `
+    position: fixed;
+    top: 10px;
+    left: 10px;
+    z-index: 200;
+    background: rgba(20, 23, 26, 0.9);
+    padding: 8px 12px;
+    border-radius: 5px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  `;
+
+  // Create label
+  const label = document.createElement('label');
+  label.textContent = 'Scene:';
+  label.style.cssText = `
+    color: #fff;
+    font-size: 12px;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  `;
+
+  // Create select dropdown
+  const select = document.createElement('select');
+  select.style.cssText = `
+    background: #333;
+    color: #fff;
+    border: 1px solid #555;
+    border-radius: 3px;
+    padding: 4px 8px;
+    font-size: 12px;
+    cursor: pointer;
+    min-width: 140px;
+  `;
+
+  // Add scene options
+  Object.entries(SCENE_NAMES).forEach(([key, name]) => {
+    const option = document.createElement('option');
+    option.value = key;
+    option.textContent = name;
+    if (key === currentScene) option.selected = true;
+    select.appendChild(option);
+  });
+
+  // Handle change
+  select.addEventListener('change', (e) => {
+    const newScene = e.target.value;
+    if (onSceneChange) onSceneChange(newScene);
+  });
+
+  container.appendChild(label);
+  container.appendChild(select);
+  document.body.appendChild(container);
+
+  return container;
+}
+
+/**
+ * Update the scene selector dropdown value.
+ * @param {string} sceneType - New scene type to select
+ */
+export function updateSceneSelector(sceneType) {
+  const selector = document.getElementById('scene-selector');
+  if (selector) {
+    const select = selector.querySelector('select');
+    if (select) select.value = sceneType;
+  }
 }
 
 /**
@@ -240,52 +325,117 @@ export function createGUI(settings, customContainer, onSettingChange) {
  * @param {Object} settings - Settings object
  * @param {Function} onEnableChange - Callback when enable state changes
  * @param {Function} onNameChange - Callback when sender name changes
+ * @param {Function} [onResolutionChange] - Callback when resolution changes
+ * @param {Function} [onFrameSkipChange] - Callback when frame skip changes
  * @returns {{folder: HTMLElement, enableCheckbox: HTMLInputElement, nameInput: HTMLInputElement}}
  */
-export function createSpoutControls(container, settings, onEnableChange, onNameChange) {
-    const spoutFolder = createFolder('Spout Output');
-    
-    // Enable checkbox
-    const enableRow = document.createElement('div');
-    enableRow.className = 'control-row';
-    const enableLabel = document.createElement('label');
-    enableLabel.textContent = 'Enable Spout';
-    const enableCheckbox = document.createElement('input');
-    enableCheckbox.type = 'checkbox';
-    enableCheckbox.checked = settings.spoutEnabled.value;
-    enableCheckbox.onchange = async () => {
-        await onEnableChange(enableCheckbox.checked);
-    };
-    enableRow.appendChild(enableLabel);
-    enableRow.appendChild(enableCheckbox);
-    spoutFolder.content.appendChild(enableRow);
-    
-    // Sender name input
-    const nameRow = document.createElement('div');
-    nameRow.className = 'control-row';
-    const nameLabel = document.createElement('label');
-    nameLabel.textContent = 'Sender Name';
-    const nameInput = document.createElement('input');
-    nameInput.type = 'text';
-    nameInput.value = settings.spoutSenderName.value;
-    nameInput.style.flex = '1';
-    nameInput.style.marginLeft = '8px';
-    nameInput.style.background = '#222';
-    nameInput.style.border = '1px solid #444';
-    nameInput.style.color = '#fff';
-    nameInput.style.padding = '4px 8px';
-    nameInput.style.borderRadius = '3px';
-    nameInput.onchange = async () => {
-        settings.spoutSenderName.value = nameInput.value;
-        if (onNameChange) await onNameChange(nameInput.value);
-    };
-    nameRow.appendChild(nameLabel);
-    nameRow.appendChild(nameInput);
-    spoutFolder.content.appendChild(nameRow);
-    
-    container.appendChild(spoutFolder.folder);
-    
-    return { folder: spoutFolder.folder, enableCheckbox, nameInput };
+export function createSpoutControls(container, settings, onEnableChange, onNameChange, onResolutionChange, onFrameSkipChange) {
+  const spoutFolder = createFolder('Spout Output');
+
+  // Enable checkbox
+  const enableRow = document.createElement('div');
+  enableRow.className = 'control-row';
+  const enableLabel = document.createElement('label');
+  enableLabel.textContent = 'Enable Spout';
+  const enableCheckbox = document.createElement('input');
+  enableCheckbox.type = 'checkbox';
+  enableCheckbox.checked = settings.spoutEnabled.value;
+  enableCheckbox.onchange = async () => {
+    await onEnableChange(enableCheckbox.checked);
+  };
+  enableRow.appendChild(enableLabel);
+  enableRow.appendChild(enableCheckbox);
+  spoutFolder.content.appendChild(enableRow);
+
+  // Sender name input
+  const nameRow = document.createElement('div');
+  nameRow.className = 'control-row';
+  const nameLabel = document.createElement('label');
+  nameLabel.textContent = 'Sender Name';
+  const nameInput = document.createElement('input');
+  nameInput.type = 'text';
+  nameInput.value = settings.spoutSenderName.value;
+  nameInput.style.flex = '1';
+  nameInput.style.marginLeft = '8px';
+  nameInput.style.background = '#222';
+  nameInput.style.border = '1px solid #444';
+  nameInput.style.color = '#fff';
+  nameInput.style.padding = '4px 8px';
+  nameInput.style.borderRadius = '3px';
+  nameInput.onchange = async () => {
+    settings.spoutSenderName.value = nameInput.value;
+    if (onNameChange) await onNameChange(nameInput.value);
+  };
+  nameRow.appendChild(nameLabel);
+  nameRow.appendChild(nameInput);
+  spoutFolder.content.appendChild(nameRow);
+
+  // Resolution selector
+  const resolutionRow = document.createElement('div');
+  resolutionRow.className = 'control-row';
+  const resolutionLabel = document.createElement('label');
+  resolutionLabel.textContent = 'Resolution';
+  const resolutionSelect = document.createElement('select');
+  resolutionSelect.style.cssText = `
+    flex: 1;
+    margin-left: 8px;
+    background: #222;
+    border: 1px solid #444;
+    color: #fff;
+    padding: 4px 8px;
+    border-radius: 3px;
+  `;
+  ['1080p', '720p'].forEach(res => {
+    const option = document.createElement('option');
+    option.value = res;
+    option.textContent = res;
+    if (res === settings.spoutResolution?.value) option.selected = true;
+    resolutionSelect.appendChild(option);
+  });
+  resolutionSelect.onchange = async () => {
+    settings.spoutResolution.value = resolutionSelect.value;
+    if (onResolutionChange) await onResolutionChange(resolutionSelect.value);
+  };
+  resolutionRow.appendChild(resolutionLabel);
+  resolutionRow.appendChild(resolutionSelect);
+  spoutFolder.content.appendChild(resolutionRow);
+
+  // Frame skip slider
+  const frameSkipRow = document.createElement('div');
+  frameSkipRow.className = 'control-row';
+  const frameSkipLabel = document.createElement('label');
+  frameSkipLabel.textContent = 'Frame Skip';
+  const frameSkipInput = document.createElement('input');
+  frameSkipInput.type = 'range';
+  frameSkipInput.min = 0;
+  frameSkipInput.max = 2;
+  frameSkipInput.step = 1;
+  frameSkipInput.value = settings.spoutFrameSkip?.value || 0;
+  frameSkipInput.style.flex = '1';
+  frameSkipInput.style.margin = '0 8px';
+  frameSkipInput.style.accentColor = '#667eea';
+  const frameSkipValue = document.createElement('span');
+  frameSkipValue.className = 'value';
+  frameSkipValue.style.width = '45px';
+  frameSkipValue.style.textAlign = 'right';
+  frameSkipValue.style.color = '#888';
+  frameSkipValue.style.fontSize = '10px';
+  const frameSkipLabels = ['60fps', '30fps', '20fps'];
+  frameSkipValue.textContent = frameSkipLabels[frameSkipInput.value];
+  frameSkipInput.oninput = () => {
+    const skip = parseInt(frameSkipInput.value);
+    settings.spoutFrameSkip.value = skip;
+    frameSkipValue.textContent = frameSkipLabels[skip];
+    if (onFrameSkipChange) onFrameSkipChange(skip);
+  };
+  frameSkipRow.appendChild(frameSkipLabel);
+  frameSkipRow.appendChild(frameSkipInput);
+  frameSkipRow.appendChild(frameSkipValue);
+  spoutFolder.content.appendChild(frameSkipRow);
+
+  container.appendChild(spoutFolder.folder);
+
+  return { folder: spoutFolder.folder, enableCheckbox, nameInput };
 }
 
 /**
@@ -298,84 +448,95 @@ export function createSpoutControls(container, settings, onEnableChange, onNameC
  * @param {boolean} isElectron - Whether running in Electron mode
  */
 export function createPointsGUI(settings, container, onChange, isElectron) {
-    const handleChange = () => {
-        if (onChange) onChange();
+  const handleChange = () => {
+    if (onChange) onChange();
+  };
+
+  // Get toggle button
+  const toggleBtn = document.getElementById('toggle-controls');
+
+  // Setup toggle button
+  if (toggleBtn) {
+    toggleBtn.classList.add('visible');
+    toggleBtn.textContent = 'Hide';
+    toggleBtn.onclick = () => {
+      container.classList.toggle('visible');
+      toggleBtn.textContent = container.classList.contains('visible') ? 'Hide' : 'Settings';
     };
-    
-    // Get toggle button
-    const toggleBtn = document.getElementById('toggle-controls');
-    
-    // Setup toggle button
-    if (toggleBtn) {
-        toggleBtn.classList.add('visible');
-        toggleBtn.textContent = 'Hide';
-        toggleBtn.onclick = () => {
-            container.classList.toggle('visible');
-            toggleBtn.textContent = container.classList.contains('visible') ? 'Hide' : 'Settings';
+  }
+
+  // Clear existing content
+  container.innerHTML = '';
+
+  // Max Width folder
+  const maxWidthFolder = createFolder('Max Width', container);
+  addSlider(maxWidthFolder.content, settings.pointsMaxWidth, handleChange);
+  addSlider(maxWidthFolder.content, settings.pointsMaxWidthBass, handleChange);
+  addSlider(maxWidthFolder.content, settings.pointsMaxWidthMid, handleChange);
+  addSlider(maxWidthFolder.content, settings.pointsMaxWidthHigh, handleChange);
+
+  // Min Width folder
+  const minWidthFolder = createFolder('Min Width', container);
+  addSlider(minWidthFolder.content, settings.pointsMinWidth, handleChange);
+  addSlider(minWidthFolder.content, settings.pointsMinWidthBass, handleChange);
+  addSlider(minWidthFolder.content, settings.pointsMinWidthMid, handleChange);
+  addSlider(minWidthFolder.content, settings.pointsMinWidthHigh, handleChange);
+
+  // Pulse Speed folder
+  const pulseFolder = createFolder('Pulse Speed', container);
+  addSlider(pulseFolder.content, settings.pointsPulseSpeed, handleChange);
+  addSlider(pulseFolder.content, settings.pointsPulseSpeedBass, handleChange);
+  addSlider(pulseFolder.content, settings.pointsPulseSpeedMid, handleChange);
+  addSlider(pulseFolder.content, settings.pointsPulseSpeedHigh, handleChange);
+
+  // Bloom folder (audio-reactive)
+  const bloomFolder = createFolder('Bloom', container);
+  addSlider(bloomFolder.content, settings.bloomIntensity, handleChange);
+  addSlider(bloomFolder.content, settings.bloomBass, handleChange);
+  addSlider(bloomFolder.content, settings.bloomMid, handleChange);
+  addSlider(bloomFolder.content, settings.bloomHigh, handleChange);
+
+  // Output folder
+  const outputFolder = createFolder('Output', container);
+  addSlider(outputFolder.content, settings.autoRotate, handleChange);
+  addSlider(outputFolder.content, settings.autoRotateSpeed, handleChange);
+  addCheckbox(outputFolder.content, settings.greenScreen, handleChange);
+
+  // Spout controls (Electron only)
+  if (isElectron) {
+    createSpoutControls(outputFolder.content, settings, async (enabled) => {
+      if (enabled) {
+        const options = {
+          resolution: settings.spoutResolution?.value || '1080p',
+          frameSkip: settings.spoutFrameSkip?.value || 0
         };
-    }
-    
-    // Clear existing content
-    container.innerHTML = '';
-    
-    // Max Width folder
-    const maxWidthFolder = createFolder('Max Width', container);
-    addSlider(maxWidthFolder.content, settings.pointsMaxWidth, handleChange);
-    addSlider(maxWidthFolder.content, settings.pointsMaxWidthBass, handleChange);
-    addSlider(maxWidthFolder.content, settings.pointsMaxWidthMid, handleChange);
-    addSlider(maxWidthFolder.content, settings.pointsMaxWidthHigh, handleChange);
-    
-    // Min Width folder
-    const minWidthFolder = createFolder('Min Width', container);
-    addSlider(minWidthFolder.content, settings.pointsMinWidth, handleChange);
-    addSlider(minWidthFolder.content, settings.pointsMinWidthBass, handleChange);
-    addSlider(minWidthFolder.content, settings.pointsMinWidthMid, handleChange);
-    addSlider(minWidthFolder.content, settings.pointsMinWidthHigh, handleChange);
-    
-    // Pulse Speed folder
-    const pulseFolder = createFolder('Pulse Speed', container);
-    addSlider(pulseFolder.content, settings.pointsPulseSpeed, handleChange);
-    addSlider(pulseFolder.content, settings.pointsPulseSpeedBass, handleChange);
-    addSlider(pulseFolder.content, settings.pointsPulseSpeedMid, handleChange);
-    addSlider(pulseFolder.content, settings.pointsPulseSpeedHigh, handleChange);
-    
-    // Bloom folder (audio-reactive)
-    const bloomFolder = createFolder('Bloom', container);
-    addSlider(bloomFolder.content, settings.bloomIntensity, handleChange);
-    addSlider(bloomFolder.content, settings.bloomBass, handleChange);
-    addSlider(bloomFolder.content, settings.bloomMid, handleChange);
-    addSlider(bloomFolder.content, settings.bloomHigh, handleChange);
-    
-    // Output folder
-    const outputFolder = createFolder('Output', container);
-    addSlider(outputFolder.content, settings.autoRotate, handleChange);
-    addSlider(outputFolder.content, settings.autoRotateSpeed, handleChange);
-    addCheckbox(outputFolder.content, settings.greenScreen, handleChange);
-    
-    // Spout controls (Electron only)
-    if (isElectron) {
-        createSpoutControls(outputFolder.content, settings, async (enabled) => {
-            if (enabled) {
-                const result = await window.spoutAPI.enable();
-                if (result.success) {
-                    settings.spoutEnabled.value = true;
-                    if (onChange) onChange();
-                }
-            } else {
-                await window.spoutAPI.disable();
-                settings.spoutEnabled.value = false;
-                if (onChange) onChange();
-            }
-        }, async (name) => {
-            settings.spoutSenderName.value = name;
-            if (settings.spoutEnabled.value) {
-                await window.spoutAPI.updateName(name);
-            }
-        });
-    }
-    
-    // Show container by default
-    container.classList.add('visible');
+        const result = await window.spoutAPI.enable(options);
+        if (result.success) {
+          settings.spoutEnabled.value = true;
+          if (onChange) onChange();
+        }
+      } else {
+        await window.spoutAPI.disable();
+        settings.spoutEnabled.value = false;
+        if (onChange) onChange();
+      }
+    }, async (name) => {
+      settings.spoutSenderName.value = name;
+      if (settings.spoutEnabled.value) {
+        await window.spoutAPI.updateName(name);
+      }
+    }, async (resolution) => {
+      settings.spoutResolution.value = resolution;
+    }, async (frameSkip) => {
+      settings.spoutFrameSkip.value = frameSkip;
+      if (settings.spoutEnabled.value) {
+        await window.spoutAPI.updateFrameSkip(frameSkip);
+      }
+    });
+  }
+
+  // Show container by default
+  container.classList.add('visible');
 }
 
 /**
@@ -441,30 +602,41 @@ export function createParticlesGUI(settings, container, onChange, isElectron) {
     addSlider(outputFolder.content, settings.autoRotateSpeed, handleChange);
     addCheckbox(outputFolder.content, settings.greenScreen, handleChange);
     
-    // Spout controls (Electron only)
-    if (isElectron) {
-        createSpoutControls(outputFolder.content, settings, async (enabled) => {
-            if (enabled) {
-                const result = await window.spoutAPI.enable();
-                if (result.success) {
-                    settings.spoutEnabled.value = true;
-                    if (onChange) onChange();
-                }
-            } else {
-                await window.spoutAPI.disable();
-                settings.spoutEnabled.value = false;
-                if (onChange) onChange();
-            }
-        }, async (name) => {
-            settings.spoutSenderName.value = name;
-            if (settings.spoutEnabled.value) {
-                await window.spoutAPI.updateName(name);
-            }
-        });
-    }
-    
-    // Show container by default
-    container.classList.add('visible');
+  // Spout controls (Electron only)
+  if (isElectron) {
+    createSpoutControls(outputFolder.content, settings, async (enabled) => {
+      if (enabled) {
+        const options = {
+          resolution: settings.spoutResolution?.value || '1080p',
+          frameSkip: settings.spoutFrameSkip?.value || 0
+        };
+        const result = await window.spoutAPI.enable(options);
+        if (result.success) {
+          settings.spoutEnabled.value = true;
+          if (onChange) onChange();
+        }
+      } else {
+        await window.spoutAPI.disable();
+        settings.spoutEnabled.value = false;
+        if (onChange) onChange();
+      }
+    }, async (name) => {
+      settings.spoutSenderName.value = name;
+      if (settings.spoutEnabled.value) {
+        await window.spoutAPI.updateName(name);
+      }
+    }, async (resolution) => {
+      settings.spoutResolution.value = resolution;
+    }, async (frameSkip) => {
+      settings.spoutFrameSkip.value = frameSkip;
+      if (settings.spoutEnabled.value) {
+        await window.spoutAPI.updateFrameSkip(frameSkip);
+      }
+    });
+  }
+
+  // Show container by default
+  container.classList.add('visible');
 }
 
 /**
@@ -509,30 +681,41 @@ export function createSkinningGUI(settings, container, onChange, isElectron) {
     addSlider(outputFolder.content, settings.autoRotateSpeed, handleChange);
     addCheckbox(outputFolder.content, settings.greenScreen, handleChange);
     
-    // Spout controls (Electron only)
-    if (isElectron) {
-        createSpoutControls(outputFolder.content, settings, async (enabled) => {
-            if (enabled) {
-                const result = await window.spoutAPI.enable();
-                if (result.success) {
-                    settings.spoutEnabled.value = true;
-                    if (onChange) onChange();
-                }
-            } else {
-                await window.spoutAPI.disable();
-                settings.spoutEnabled.value = false;
-                if (onChange) onChange();
-            }
-        }, async (name) => {
-            settings.spoutSenderName.value = name;
-            if (settings.spoutEnabled.value) {
-                await window.spoutAPI.updateName(name);
-            }
-        });
-    }
-    
-    // Show container by default
-    container.classList.add('visible');
+  // Spout controls (Electron only)
+  if (isElectron) {
+    createSpoutControls(outputFolder.content, settings, async (enabled) => {
+      if (enabled) {
+        const options = {
+          resolution: settings.spoutResolution?.value || '1080p',
+          frameSkip: settings.spoutFrameSkip?.value || 0
+        };
+        const result = await window.spoutAPI.enable(options);
+        if (result.success) {
+          settings.spoutEnabled.value = true;
+          if (onChange) onChange();
+        }
+      } else {
+        await window.spoutAPI.disable();
+        settings.spoutEnabled.value = false;
+        if (onChange) onChange();
+      }
+    }, async (name) => {
+      settings.spoutSenderName.value = name;
+      if (settings.spoutEnabled.value) {
+        await window.spoutAPI.updateName(name);
+      }
+    }, async (resolution) => {
+      settings.spoutResolution.value = resolution;
+    }, async (frameSkip) => {
+      settings.spoutFrameSkip.value = frameSkip;
+      if (settings.spoutEnabled.value) {
+        await window.spoutAPI.updateFrameSkip(frameSkip);
+      }
+    });
+  }
+
+  // Show container by default
+  container.classList.add('visible');
 }
 
 /**

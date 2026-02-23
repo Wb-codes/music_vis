@@ -7,21 +7,22 @@ contextBridge.exposeInMainWorld('electronAPI', {
 });
 
 contextBridge.exposeInMainWorld('spoutAPI', {
-    isAvailable: () => ipcRenderer.invoke('spout:check-available'),
-    enable: () => ipcRenderer.invoke('spout:enable'),
-    disable: () => ipcRenderer.invoke('spout:disable'),
-    getStatus: () => ipcRenderer.invoke('spout:get-status'),
-    updateName: (name) => ipcRenderer.invoke('spout:update-name', name),
-    onStatusChange: (callback) => {
-        ipcRenderer.on('spout:status-changed', (event, enabled) => callback(enabled));
-    },
-    onSceneRequest: (callback) => {
-        ipcRenderer.on('spout:request-scene', () => callback());
-    },
-    syncSettings: (settings) => ipcRenderer.send('sync:settings', settings),
-    syncAudio: (audioData) => ipcRenderer.send('sync:audio', audioData),
-    syncScene: (sceneType) => ipcRenderer.send('sync:scene', sceneType),
-    syncTime: (elapsedTime) => ipcRenderer.send('sync:time', elapsedTime)
+  isAvailable: () => ipcRenderer.invoke('spout:check-available'),
+  enable: (options) => ipcRenderer.invoke('spout:enable', options),
+  disable: () => ipcRenderer.invoke('spout:disable'),
+  getStatus: () => ipcRenderer.invoke('spout:get-status'),
+  updateName: (name) => ipcRenderer.invoke('spout:update-name', name),
+  updateFrameSkip: (skip) => ipcRenderer.invoke('spout:update-frame-skip', skip),
+  onStatusChange: (callback) => {
+    ipcRenderer.on('spout:status-changed', (event, enabled) => callback(enabled));
+  },
+  onSceneRequest: (callback) => {
+    ipcRenderer.on('spout:request-scene', () => callback());
+  },
+  syncSettings: (settings) => ipcRenderer.send('sync:settings', settings),
+  syncAudio: (audioData) => ipcRenderer.send('sync:audio', audioData),
+  syncScene: (sceneType) => ipcRenderer.send('sync:scene', sceneType),
+  syncTime: (elapsedTime) => ipcRenderer.send('sync:time', elapsedTime)
 });
 
 contextBridge.exposeInMainWorld('spoutSync', {
