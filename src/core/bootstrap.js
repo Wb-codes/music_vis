@@ -9,6 +9,7 @@ import { initRenderer, setupPostProcessing, updateBloom, updateControls, resetCa
 import { getDelta } from './animation.js';
 import { initScene, updateScene, getCurrentSceneType } from '../scenes/registry.js';
 import { analyzeAudio } from '../audio/capture.js';
+import { audioBass, audioMid, audioHigh, audioOverall } from '../audio/uniforms.js';
 
 /**
  * Application state
@@ -112,10 +113,10 @@ function animate() {
     const renderer = getRenderer();
     const settings = appState.settings;
 
-    if (!settings) return;
+  if (!settings) return;
 
-    // Analyze audio
-    const audioData = analyzeAudio(settings);
+  // Get audio data - analyze locally, uniforms are automatically updated for shaders
+  const audioData = analyzeAudio(settings);
     
     // Notify audio update callback
     if (appState.onAudioUpdate) {
