@@ -49,20 +49,31 @@ export function getSelectedAudioSource() {
 /**
  * Initialize audio capture.
  * Shows device selector in browser, source selector in Electron.
+ * Auto-detects OBS Browser Source and uses dummy audio to avoid permission dialogs.
  * @returns {Promise<boolean>} True if audio initialized successfully
  */
 export async function initAudio() {
-    try {
-        if (window.isElectron && window.electronAPI) {
-            return initElectronAudio();
-        } else {
-            return initBrowserAudio();
-        }
-    } catch (err) {
-        console.error('Audio error:', err);
-        handleAudioError(err);
-        return false;
+  try {
+    // Check for dummy audio mode (OBS Browser Source or URL parameter)
+    const urlParams = new URLSearchParams(window.location.search);
+    const useDummyAudio = urlParams.get('audio') === 'dummy' || isOBSBrowserSource();
+    
+    if (useDummyAudio) {
+      console.log('[Audio] Dummy audio mode detected - using synthetic audio');
+      return initDummyAudio();
     }
+    
+    // Normal audio initialization
+    if (window.isElectron && window.electronAPI) {
+      return initElectronAudio();
+    } else {
+      return initBrowserAudio();
+    }
+  } catch (err) {
+    console.error('Audio error:', err);
+    handleAudioError(err);
+    return false;
+  }
 }
 
 /**
@@ -288,5 +299,113 @@ export function getAudioContext() {
  * @returns {AnalyserNode|null}
  */
 export function getAnalyser() {
-    return analyser;
+  return analyser;
+}
+
+/**
+ * Initialize dummy audio for OBS Browser Source or fallback.
+ * Creates synthetic audio using oscillators - no permissions needed.
+ * @returns {Promise<boolean>} True if dummy audio initialized
+ */
+export async function initDummyAudio() {
+  console.log('[Audio] Initializing dummy audio source (no permissions needed)');
+  
+  try {
+    // Create audio context
+    audioContext = new (window.AudioContext || window.webkitAudioContext)();
+    
+    if (audioContext.state === 'suspended') {
+      await audioContext.resume();
+    }
+    
+    // Create master gain node
+    const masterGain = audioContext.createGain();
+    masterGain.gain.value = 0.05; // Very quiet
+    
+    // Create analyser
+    analyser = audioContext.createAnalyser();
+    analyser.fftSize = 512;
+    analyser.smoothingTimeConstant = 0.75;
+    
+    // Connect master gain to analyser
+    masterGain.connect(analyser);
+    
+    // Create data array for analysis
+    dataArray = new Uint8Array(analyser.frequencyBinCount);
+    
+    // Create oscillators for synthetic audio
+    // Different frequencies to simulate bass/mid/high
+    const oscillators = [];
+    const frequencies = [
+      { freq: 60, type: 'sine', gain: 0.8 },      // Bass
+      { freq: 500, type: 'square', gain: 0.5 }, // Mid  
+      { freq: 2000, type: 'sawtooth', gain: 0.3 } // High
+    ];
+    
+    frequencies.forEach((config, i) => {
+      const osc = audioContext.createOscillator();
+      const gain = audioContext.createGain();
+      
+      osc.type = config.type;
+      osc.frequency.value = config.freq;
+      gain.gain.value = config.gain / frequencies.length;
+      
+      osc.connect(gain);
+      gain.connect(masterGain);
+      
+      osc.start();
+      
+      // Modulate frequency over time for visual interest
+      const modulation = setInterval(() => {
+        const time = Date.now() / 1000;
+        // Vary frequency based on time
+        const variation = Math.sin(time * (0.5 + i * 0.3)) * 20;
+        osc.frequency.value = config.freq + variation;
+      }, 50);
+      
+      oscillators.push({ osc, gain, modulation });
+    });
+    
+    // Store oscillators for cleanup
+    window.__dummyAudioOscillators = oscillators;
+    
+    // Update UI status
+    setAudioActive('Dummy Audio (Synthetic)');
+    
+    console.log('[Audio] ✅ Dummy audio initialized successfully');
+    console.log('[Audio] Using synthetic audio - no permission dialogs needed');
+    console.log('[Audio] Visualizer will have reactive audio patterns');
+    
+    return true;
+    
+  } catch (err) {
+    console.error('[Audio] Dummy audio failed:', err);
+    setAudioError('Dummy audio failed: ' + err.message);
+    return false;
+  }
+}
+
+/**
+ * Cleanup dummy audio oscillators.
+ */
+export function cleanupDummyAudio() {
+  if (window.__dummyAudioOscillators) {
+    window.__dummyAudioOscillators.forEach(({ osc, modulation }) => {
+      clearInterval(modulation);
+      osc.stop();
+    });
+    window.__dummyAudioOscillators = null;
+  }
+}
+
+/**
+ * Detect OBS Browser Source environment.
+ * @returns {boolean} True if running in OBS Browser Source
+ */
+export function isOBSBrowserSource() {
+  const ua = navigator.userAgent.toLowerCase();
+  return ua.includes('obs') || 
+         ua.includes('cef') ||
+         window.location.search.includes('obs=true') ||
+         window.location.search.includes('audio=dummy');
 }

@@ -4,6 +4,8 @@
  * All settings are reactive and control visual parameters.
  */
 
+import { ANIMATION_NAMES, DEFAULT_ANIMATION } from '../core/animations.js';
+
 /**
  * @typedef {Object} NumberSetting
  * @property {number} value - Current value
@@ -22,6 +24,7 @@
  * @typedef {Object} StringSetting
  * @property {string} value - Current value
  * @property {string} label - Display label for UI
+ * @property {string[]} [options] - Optional array of options for dropdown
  */
 
 /**
@@ -128,13 +131,17 @@ export const defaultSettings = {
     /** Bloom high sensitivity */
     bloomHigh: { value: 0.2, min: 0, max: 2, label: "High Sens" },
     
-    // === Camera Controls ===
-    /** Enable automatic camera rotation */
-    autoRotate: { value: true, label: "Auto Rotate" },
-    /** Camera rotation speed (negative for reverse) */
-    autoRotateSpeed: { value: 2, min: -10, max: 10, label: "Rotate Speed" },
-    
-    // === Output ===
+// === Camera Controls ===
+  /** Enable automatic camera rotation */
+  autoRotate: { value: true, label: "Auto Rotate" },
+  /** Camera rotation speed (negative for reverse) */
+  autoRotateSpeed: { value: 2, min: -10, max: 10, label: "Rotate Speed" },
+
+  // === Skinning Scene Animation ===
+  /** Current animation for skinning scene (options populated at runtime) */
+  currentAnimation: { value: "DanceLoop", label: "Animation", options: [] },
+
+  // === Output ===
     /** Enable green screen background for OBS chroma key */
     greenScreen: { value: false, label: "Green Screen" },
     

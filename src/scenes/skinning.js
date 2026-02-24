@@ -12,22 +12,29 @@ import {
 } from 'three/tsl';
 
 import { audioBass, audioMid, audioHigh } from '../audio/uniforms.js';
+import { getFullAnimationName, DEFAULT_ANIMATION } from '../core/animations.js';
 
 /**
  * Skinning scene state and configuration.
  * @type {Object}
  */
 export const skinningScene = {
-    /** @type {THREE.Scene|null} */
-    scene: null,
-    /** @type {THREE.AnimationMixer|null} */
-    mixer: null,
-    /** @type {THREE.Clock} */
-    clock: new THREE.Clock(),
-    /** @type {boolean} */
-    loaded: false,
-    /** @type {THREE.Color} */
-    backgroundColor: new THREE.Color(0x111111)
+  /** @type {THREE.Scene|null} */
+  scene: null,
+  /** @type {THREE.AnimationMixer|null} */
+  mixer: null,
+  /** @type {THREE.Clock} */
+  clock: new THREE.Clock(),
+  /** @type {boolean} */
+  loaded: false,
+  /** @type {THREE.Color} */
+  backgroundColor: new THREE.Color(0x111111),
+  /** @type {Array<THREE.AnimationClip>|null} */
+  animations: null,
+  /** @type {THREE.AnimationAction|null} */
+  currentAction: null,
+  /** @type {string} */
+  currentAnimationName: DEFAULT_ANIMATION
 };
 
 /**
@@ -52,14 +59,13 @@ export async function initSkinningScene(renderer, camera, controls) {
         loader.load(
             'models/gltf/Michelle.glb', 
             (gltf) => {
-                console.log('Model loaded, animations:', gltf.animations.map(a => a.name));
-                const object = gltf.scene;
-                skinningScene.mixer = new THREE.AnimationMixer(object);
+console.log('Model loaded, animations:', gltf.animations.map(a => a.name));
+        const object = gltf.scene;
+        skinningScene.mixer = new THREE.AnimationMixer(object);
+        skinningScene.animations = gltf.animations;
 
-                // Find and play animation clip
-                const clip = gltf.animations.find(a => a.name === 'VRM|DanceLoop@24') || gltf.animations[0];
-                const action = skinningScene.mixer.clipAction(clip);
-                action.play();
+        // Play default animation
+        playAnimation(DEFAULT_ANIMATION);
 
                 object.traverse((child) => {
                     if (child.isMesh && child.skeleton) {
@@ -136,8 +142,58 @@ export async function initSkinningScene(renderer, camera, controls) {
                 console.error('Error loading GLB:', error);
                 reject(error);
             }
-        );
-    });
+);
+  });
+}
+
+/**
+ * Play a specific animation by clean name
+ * @param {string} cleanName - Clean animation name (e.g., 'DanceLoop')
+ * @returns {boolean} True if animation was found and played
+ */
+function playAnimation(cleanName) {
+  if (!skinningScene.mixer || !skinningScene.animations) {
+    console.warn('Cannot play animation: mixer or animations not loaded');
+    return false;
+  }
+
+  const fullName = getFullAnimationName(cleanName);
+  if (!fullName) {
+    console.warn('Unknown animation:', cleanName);
+    return false;
+  }
+
+  const clip = skinningScene.animations.find(a => a.name === fullName);
+  if (!clip) {
+    console.warn('Animation clip not found in model:', fullName);
+    return false;
+  }
+
+  // Stop current action if exists
+  if (skinningScene.currentAction) {
+    skinningScene.currentAction.stop();
+  }
+
+  // Play new action
+  const action = skinningScene.mixer.clipAction(clip);
+  action.play();
+  skinningScene.currentAction = action;
+  skinningScene.currentAnimationName = cleanName;
+
+  console.log('Playing animation:', cleanName);
+  return true;
+}
+
+/**
+ * Switch to a different animation
+ * @param {string} cleanName - Clean animation name (e.g., 'DanceLoop')
+ * @returns {boolean} True if successful
+ */
+export function switchAnimation(cleanName) {
+  if (cleanName === skinningScene.currentAnimationName) {
+    return true; // Already playing this animation
+  }
+  return playAnimation(cleanName);
 }
 
 /**

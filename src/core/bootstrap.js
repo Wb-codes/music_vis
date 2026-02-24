@@ -42,18 +42,48 @@ const appState = {
  * @throws {Error} If WebGPU is not available
  */
 export async function initVisualization(options) {
-    const { settings, sceneType, rendererConfig = {}, onSettingsChange, onAudioUpdate, onRender } = options;
-    
-    appState.settings = settings;
-    appState.onSettingsChange = onSettingsChange;
-    appState.onAudioUpdate = onAudioUpdate;
-    appState.onRender = onRender;
+  const { settings, sceneType, rendererConfig = {}, onSettingsChange, onAudioUpdate, onRender } = options;
 
-    // Check WebGPU support
-    if (!WebGPU.isAvailable()) {
-        document.body.appendChild(WebGPU.getErrorMessage());
-        throw new Error('No WebGPU support');
+  console.log('[Bootstrap] Starting visualization initialization...');
+  console.log('[Bootstrap] Scene type:', sceneType);
+  console.log('[Bootstrap] Renderer config:', rendererConfig);
+
+  appState.settings = settings;
+  appState.onSettingsChange = onSettingsChange;
+  appState.onAudioUpdate = onAudioUpdate;
+  appState.onRender = onRender;
+
+  // Check WebGPU support
+  console.log('[Bootstrap] Checking WebGPU support...');
+  
+  const webgpuAvailable = WebGPU.isAvailable();
+  console.log('[Bootstrap] WebGPU.isAvailable():', webgpuAvailable);
+  
+  if (!webgpuAvailable) {
+    console.error('[Bootstrap] WebGPU not available!');
+    
+    // Get error message element but convert to text
+    const errorElement = WebGPU.getErrorMessage();
+    let errorText = 'WebGPU initialization failed';
+    
+    if (errorElement) {
+      if (typeof errorElement === 'string') {
+        errorText = errorElement;
+      } else if (errorElement.textContent) {
+        errorText = errorElement.textContent;
+      } else if (errorElement.innerHTML) {
+        errorText = errorElement.innerHTML.replace(/<[^>]*>/g, ''); // Strip HTML tags
+      }
+      // Append the actual error element to body for display
+      document.body.appendChild(errorElement);
     }
+    
+    console.error('[Bootstrap] Error message:', errorText);
+    console.error('[Bootstrap] User Agent:', navigator.userAgent);
+    
+    throw new Error('No WebGPU support: ' + errorText);
+  }
+  console.log('[Bootstrap] WebGPU is available');
 
     // Initialize renderer once
     if (!appState.isInitialized) {

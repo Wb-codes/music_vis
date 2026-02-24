@@ -3,8 +3,8 @@
   "version": "1.0.0",
   "main": "electron/main.js",
   "scripts": {
-    "start": "serve -p 3002",
-    "dev": "serve -p 3002",
+    "start": "serve -p 3004",
+    "dev": "serve -p 3004",
     "electron": "electron .",
     "rebuild-spout": "cd node_modules/electron-spout && cmake-js compile",
     "electron-rebuild": "electron-rebuild -f -w electron-spout"

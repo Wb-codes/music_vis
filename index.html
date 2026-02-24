@@ -127,18 +127,50 @@
             display: none;
         }
         #scene-indicator.visible { display: block; }
-        #scene-indicator span { cursor: pointer; text-decoration: underline; }
-    </style>
-    <script type="importmap">
-    {
-        "imports": {
-            "three": "./node_modules/three/build/three.webgpu.js",
-            "three/webgpu": "./node_modules/three/build/three.webgpu.js",
-            "three/tsl": "./node_modules/three/build/three.tsl.js",
-            "three/addons/": "./node_modules/three/examples/jsm/"
-        }
-    }
-    </script>
+  #scene-indicator span { cursor: pointer; text-decoration: underline; }
+</style>
+<!-- OBS Browser Source Detection & CDN Fallback -->
+<!-- CEF (Chromium Embedded Framework) used by OBS may have issues with local file:// imports -->
+<!-- We detect OBS and use CDN imports to ensure WebGPU works correctly -->
+<script>
+  // Detect OBS Browser Source or request for CDN mode
+  const isOBSBrowserSource = navigator.userAgent.toLowerCase().includes('obs') || 
+                              navigator.userAgent.toLowerCase().includes('cef') ||
+                              window.location.search.includes('cdn=true') ||
+                              window.location.search.includes('obs=true');
+  
+  if (isOBSBrowserSource) {
+    console.log('[OBS Browser Source] Detected - Using CDN imports for WebGPU compatibility');
+    
+    // Create and inject CDN import map
+    const importMap = document.createElement('script');
+    importMap.type = 'importmap';
+    importMap.textContent = JSON.stringify({
+      "imports": {
+        "three": "https://unpkg.com/three@0.179.0/build/three.webgpu.js",
+        "three/webgpu": "https://unpkg.com/three@0.179.0/build/three.webgpu.js",
+        "three/tsl": "https://unpkg.com/three@0.179.0/build/three.tsl.js",
+        "three/addons/": "https://unpkg.com/three@0.179.0/examples/jsm/"
+      }
+    });
+    document.head.appendChild(importMap);
+  } else {
+    console.log('[Local] Using local module imports');
+    
+    // Create and inject local import map
+    const importMap = document.createElement('script');
+    importMap.type = 'importmap';
+    importMap.textContent = JSON.stringify({
+      "imports": {
+        "three": "./node_modules/three/build/three.webgpu.js",
+        "three/webgpu": "./node_modules/three/build/three.webgpu.js",
+        "three/tsl": "./node_modules/three/build/three.tsl.js",
+        "three/addons/": "./node_modules/three/examples/jsm/"
+      }
+    });
+    document.head.appendChild(importMap);
+  }
+</script>
 </head>
 <body>
   <div id="start-overlay">

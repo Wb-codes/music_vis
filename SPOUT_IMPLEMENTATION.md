@@ -1,7 +1,7 @@
 # Spout Output Implementation Checklist
 
 ## Overview
-Add Spout output capability to the music visualizer by wrapping it in Electron. Each scene will have a checkbox to enable/disable Spout output independently.
+Add Spout output capability to the music visualizer by wrapping it in Electron. Each scene will have a checkbox to enable/disable Spout output.
 
 ## Prerequisites
 - Windows OS (Spout is Windows-only)

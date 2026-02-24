@@ -68,27 +68,39 @@ export function getWebGPUErrorMessage() {
  * @throws {Error} If WebGPU is not available
  */
 export async function initRenderer(options = {}) {
-    if (!WebGPU.isAvailable()) {
-        document.body.appendChild(WebGPU.getErrorMessage());
-        throw new Error('No WebGPU support');
-    }
+  console.log('[Renderer] Checking WebGPU availability...');
+  
+  if (!WebGPU.isAvailable()) {
+    console.error('[Renderer] WebGPU not available');
+    const errorMsg = WebGPU.getErrorMessage();
+    console.error('[Renderer] Error message:', errorMsg);
+    document.body.appendChild(errorMsg);
+    throw new Error('No WebGPU support');
+  }
+  
+  console.log('[Renderer] WebGPU is available');
 
-    if (isInitialized) {
-        return getRendererSetup();
-    }
+  if (isInitialized) {
+    console.log('[Renderer] Already initialized, returning existing setup');
+    return getRendererSetup();
+  }
 
-    const {
-        width = RENDERER_CONFIG.width,
-        height = RENDERER_CONFIG.height,
-        container = document.body,
-        autoRotate = true,
-        autoRotateSpeed = 2
-    } = options;
+  const {
+    width = RENDERER_CONFIG.width,
+    height = RENDERER_CONFIG.height,
+    container = document.body,
+    autoRotate = true,
+    autoRotateSpeed = 2
+  } = options;
 
+  try {
+    console.log('[Renderer] Creating camera...');
     // Create camera
     camera = new THREE.PerspectiveCamera(60, width / height, 0.1, 1000);
     camera.position.set(0, 0, 15);
+    console.log('[Renderer] Camera created');
 
+    console.log('[Renderer] Creating WebGPU renderer...');
     // Create renderer
     renderer = new THREE.WebGPURenderer({ antialias: true });
     renderer.setClearColor(0x14171a);
@@ -96,17 +108,56 @@ export async function initRenderer(options = {}) {
     renderer.setSize(width, height);
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
     container.appendChild(renderer.domElement);
+    console.log('[Renderer] Renderer created, canvas added to DOM');
+    
+    console.log('[Renderer] Initializing WebGPU context...');
     await renderer.init();
+    console.log('[Renderer] WebGPU context initialized successfully');
 
+    console.log('[Renderer] Creating OrbitControls...');
     // Create controls
     controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
     controls.autoRotate = autoRotate;
     controls.autoRotateSpeed = autoRotateSpeed;
     controls.maxDistance = 200;
+    console.log('[Renderer] Controls created');
 
     isInitialized = true;
+    console.log('[Renderer] Initialization complete');
     return getRendererSetup();
+    
+  } catch (err) {
+    console.error('[Renderer] Initialization failed:', err);
+    console.error('[Renderer] Error stack:', err.stack);
+    
+    // Cleanup on failure
+    if (renderer && renderer.domElement && renderer.domElement.parentNode) {
+      renderer.domElement.parentNode.removeChild(renderer.domElement);
+    }
+    renderer = null;
+    camera = null;
+    controls = null;
+    
+    // Show error in UI
+    const errorDiv = document.createElement('div');
+    errorDiv.style.cssText = `
+      position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+      background: rgba(200, 50, 50, 0.9); color: white; padding: 20px;
+      border-radius: 10px; font-family: sans-serif; z-index: 10000;
+      max-width: 80%; text-align: center;
+    `;
+    errorDiv.innerHTML = `
+      <h3>WebGPU Initialization Failed</h3>
+      <p>Error: ${err.message}</p>
+      <p>User Agent: ${navigator.userAgent}</p>
+      <p>This may be due to CEF/OBS Browser Source restrictions.</p>
+      <p>Try using Electron app with Spout output instead.</p>
+    `;
+    document.body.appendChild(errorDiv);
+    
+    throw err;
+  }
 }
 
 /**

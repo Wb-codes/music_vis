@@ -5,6 +5,8 @@
  */
 
 import { SCENE_NAMES } from '../core/constants.js';
+import { ANIMATION_NAMES, DEFAULT_ANIMATION } from '../core/animations.js';
+import { switchAnimation } from '../scenes/skinning.js';
 
 /**
  * Create a folder in the GUI.
@@ -716,6 +718,96 @@ export function createSkinningGUI(settings, container, onChange, isElectron) {
 
   // Show container by default
   container.classList.add('visible');
+
+  // Create animation picker (top center)
+  createAnimationPicker(settings.currentAnimation.value, ANIMATION_NAMES, (animationName) => {
+    settings.currentAnimation.value = animationName;
+    switchAnimation(animationName); // Update the actual animation in the scene
+    if (onChange) onChange();
+  });
+}
+
+/**
+ * Create animation picker dropdown at the top center of the screen.
+ * @param {string} currentAnimation - Currently selected animation name
+ * @param {string[]} animationOptions - Array of available animation names
+ * @param {Function} onChange - Callback when animation changes
+ * @returns {HTMLElement} The created dropdown container
+ */
+export function createAnimationPicker(currentAnimation, animationOptions, onChange) {
+  // Remove existing picker if present
+  const existing = document.getElementById('animation-picker');
+  if (existing) existing.remove();
+
+  // Create container
+  const container = document.createElement('div');
+  container.id = 'animation-picker';
+  container.style.cssText = `
+    position: fixed;
+    top: 10px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 200;
+    background: rgba(20, 23, 26, 0.9);
+    padding: 8px 12px;
+    border-radius: 5px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  `;
+
+  // Create label
+  const label = document.createElement('label');
+  label.textContent = 'Animation:';
+  label.style.cssText = `
+    color: #fff;
+    font-size: 12px;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    white-space: nowrap;
+  `;
+
+  // Create select dropdown
+  const select = document.createElement('select');
+  select.style.cssText = `
+    background: #333;
+    color: #fff;
+    border: 1px solid #555;
+    border-radius: 3px;
+    padding: 4px 8px;
+    font-size: 12px;
+    cursor: pointer;
+    min-width: 140px;
+    max-width: 200px;
+  `;
+
+  // Add animation options
+  animationOptions.forEach((animName) => {
+    const option = document.createElement('option');
+    option.value = animName;
+    option.textContent = animName;
+    if (animName === currentAnimation) option.selected = true;
+    select.appendChild(option);
+  });
+
+  // Handle change
+  select.addEventListener('change', (e) => {
+    const newAnimation = e.target.value;
+    if (onChange) onChange(newAnimation);
+  });
+
+  container.appendChild(label);
+  container.appendChild(select);
+  document.body.appendChild(container);
+
+  return container;
+}
+
+/**
+ * Remove the animation picker from the DOM.
+ */
+export function removeAnimationPicker() {
+  const picker = document.getElementById('animation-picker');
+  if (picker) picker.remove();
 }
 
 /**
