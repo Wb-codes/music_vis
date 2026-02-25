@@ -1,3 +1,13 @@
 node_modules/
 .env
 .DS_Store
+
+# Blender files
+*.blend
+*.blend1
+*.blend2
+*.blend@
+
+# Documentation files (keep only README.md)
+*.md
+!README.md
