@@ -9,7 +9,7 @@
  * Default fade delay in milliseconds
  * @type {number}
  */
-const DEFAULT_FADE_DELAY = 10000; // 10 seconds
+const DEFAULT_FADE_DELAY = 2000; // 2 seconds
 
 /**
  * CSS transition duration in milliseconds

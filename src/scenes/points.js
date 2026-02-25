@@ -286,8 +286,9 @@ export function updatePointsScene(delta, settings, renderer, audioData) {
     high: settings.pointsWaveSpeedHigh?.value ?? 20
   };
   const waveMagnitude = calculateAudioMagnitude(waveConfig, smoothedAudio);
-  // Base 0.05, max 0.8 - travels 5% to 80% of curve per second (much slower)
-  pointsScene.waveSpeed.value = 0.05 + (waveMagnitude * 0.75);
+  // Base 0.05, max 0.75 - travels 5% to 75% of curve per second
+  // At 100% intensity with full audio, reaches maximum of 0.75
+  pointsScene.waveSpeed.value = 0.05 + (waveMagnitude * 0.175);
   
   // Wave Length - how many points are in the chain
   pointsScene.waveLength.value = settings.pointsWaveLength?.value ?? 30;
