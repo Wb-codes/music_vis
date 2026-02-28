@@ -1,4 +1,0 @@
-FROM node:20-bookworm
-WORKDIR /app
-RUN npm install -g opencode-ai
-CMD ["sh"]
